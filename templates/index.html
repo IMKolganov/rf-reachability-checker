@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RF Reachability Check</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <p class="eyebrow">Проверка из России</p>
+      <h1>RF Reachability</h1>
+      <p class="lead">
+        Введите IP или домен — проверим доступность с хостинга
+        <strong>{{ site_name }}</strong> (Москва / РФ).
+      </p>
+    </header>
+
+    <section class="panel">
+      <form id="check-form" class="check-form">
+        <label for="target">Сервер</label>
+        <div class="row">
+          <input
+            id="target"
+            name="target"
+            type="text"
+            placeholder="google.com или 8.8.8.8"
+            autocomplete="off"
+            required
+          >
+          <button type="submit" id="submit-btn">Проверить</button>
+        </div>
+        <p class="hint">Можно указать URL: <code>https://www.google.com/</code></p>
+      </form>
+    </section>
+
+    <section id="result" class="panel result hidden" aria-live="polite"></section>
+
+    <footer class="footer">
+      <span id="probe-from"></span>
+    </footer>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
