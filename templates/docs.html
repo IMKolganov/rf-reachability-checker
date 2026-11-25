@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title data-i18n="docs">Документация API</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+</head>
+<body>
+  <main class="shell">
+    <div class="toolbar">
+      <nav class="nav-links" aria-label="RF Reachability">
+        <a href="{{ url_for('index') }}" data-i18n="home">На главную</a>
+        <a href="{{ url_for('openapi') }}" data-i18n="schema">Схема OpenAPI (JSON)</a>
+      </nav>
+      <div class="preferences">
+        <label for="language">
+          <span data-i18n="language">Язык</span>
+          <select id="language">
+            <option value="system" data-i18n="system">Как в системе</option>
+            <option value="en" lang="en">English</option>
+            <option value="ru" lang="ru">Русский</option>
+          </select>
+        </label>
+        <label for="theme">
+          <span data-i18n="theme">Тема</span>
+          <select id="theme">
+            <option value="system" data-i18n="system">Как в системе</option>
+            <option value="light" data-i18n="light">Светлая</option>
+            <option value="dark" data-i18n="dark">Тёмная</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <header class="hero">
+      <h1 data-i18n="docs">Документация API</h1>
+      <p class="lead" data-i18n="docsIntro">API проверяет DNS, соединение с TCP-портами и HTTP-ответ с сервера в России.</p>
+    </header>
+
+    <section class="panel docs">
+      <h2 data-i18n="request">Запрос</h2>
+      <p data-i18n="docsTarget">Обязательный параметр target принимает домен, IP-адрес или HTTP(S)-URL.</p>
+      <pre><code>GET {{ url_for('api_check_get') }}?target=example.com</code></pre>
+      <pre><code>POST {{ url_for('api_check') }}
+Content-Type: application/json
+
+{"target": "https://example.com/"}</code></pre>
+
+      <h2 data-i18n="response">Ответ</h2>
+      <p data-i18n="docsSuccess">При валидном запросе API возвращает 200 и результаты проверок. Поле reachable показывает, удалось ли подтвердить доступность.</p>
+      <p data-i18n="docsHttp">Поле http может быть null. Если сервер ответил по HTTP, поле http.ok равно true даже при статусе 4xx или 5xx.</p>
+      <p data-i18n="docsError">Если цель не указана или невалидна, API возвращает 400 и объект с полем error.</p>
+    </section>
+  </main>
+</body>
+</html>

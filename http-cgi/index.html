@@ -3,35 +3,64 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>RF Reachability Check</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <title>RF Reachability</title>
+  <link rel="stylesheet" href="static/style.css">
+  <script src="static/app.js" defer></script>
 </head>
 <body>
   <main class="shell">
+    <div class="toolbar">
+      <nav class="nav-links" aria-label="API">
+        <a href="docs.html" data-i18n="docs">Документация API</a>
+        <a href="openapi.json" data-i18n="schema">Схема OpenAPI (JSON)</a>
+      </nav>
+      <div class="preferences">
+        <label for="language">
+          <span data-i18n="language">Язык</span>
+          <select id="language">
+            <option value="system" data-i18n="system">Как в системе</option>
+            <option value="en" lang="en">English</option>
+            <option value="ru" lang="ru">Русский</option>
+          </select>
+        </label>
+        <label for="theme">
+          <span data-i18n="theme">Тема</span>
+          <select id="theme">
+            <option value="system" data-i18n="system">Как в системе</option>
+            <option value="light" data-i18n="light">Светлая</option>
+            <option value="dark" data-i18n="dark">Тёмная</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
     <header class="hero">
-      <p class="eyebrow">Проверка из России</p>
+      <p class="eyebrow" data-i18n="checkFromRussia">Проверка из России</p>
       <h1>RF Reachability</h1>
       <p class="lead">
-        Введите IP или домен — проверим доступность с хостинга
-        <strong>rf-probe</strong> (Москва / РФ).
+        <span data-i18n="lead">Введите IP-адрес или домен, чтобы проверить доступность с хостинга</span>
+        <strong>rf-probe</strong> <span data-i18n="location">(Москва, Россия).</span>
       </p>
     </header>
 
     <section class="panel">
-      <form id="check-form" class="check-form">
-        <label for="target">Сервер</label>
+      <form id="check-form" class="check-form" action="check.cgi" method="get">
+        <label for="target" data-i18n="server">Сервер</label>
         <div class="row">
           <input
             id="target"
             name="target"
             type="text"
-            placeholder="google.com или 8.8.8.8"
+            placeholder="example.com или 8.8.8.8"
+            inputmode="url"
             autocomplete="off"
+            autocapitalize="off"
+            spellcheck="false"
             required
           >
-          <button type="submit" id="submit-btn">Проверить</button>
+          <button type="submit" id="submit-btn" data-i18n="submit">Проверить</button>
         </div>
-        <p class="hint">Можно указать URL: <code>https://www.google.com/</code></p>
+        <p class="hint"><span data-i18n="hint">Можно указать URL</span> <code>https://example.com/</code></p>
       </form>
     </section>
 
@@ -41,7 +70,5 @@
       <span id="probe-from"></span>
     </footer>
   </main>
-
-  <script src="/static/app.js"></script>
 </body>
 </html>
