@@ -5,7 +5,7 @@ const translations = {
     home: "На главную",
     language: "Язык",
     theme: "Тема",
-    system: "Как в системе",
+    system: "Система",
     light: "Светлая",
     dark: "Тёмная",
     checkFromRussia: "Проверка из России",
@@ -31,6 +31,7 @@ const translations = {
     httpRequest: (protocol) => `${protocol}-запрос`,
     httpReply: (protocol) => `Получен ответ на ${protocol}-запрос`,
     httpStatusError: "Сервер вернул ошибку",
+    httpAuthRequired: "Сервер доступен. Для доступа нужна авторизация.",
     httpNoReply: (protocol) => `Нет ответа на ${protocol}-запрос`,
     timeout: "Время ожидания истекло",
     response: "Ответ",
@@ -62,7 +63,7 @@ const translations = {
     home: "Back to checker",
     language: "Language",
     theme: "Theme",
-    system: "System default",
+    system: "System",
     light: "Light",
     dark: "Dark",
     checkFromRussia: "Check from Russia",
@@ -88,6 +89,7 @@ const translations = {
     httpRequest: (protocol) => `${protocol} request`,
     httpReply: (protocol) => `Received a response to the ${protocol} request`,
     httpStatusError: "Server returned an error",
+    httpAuthRequired: "The server is reachable. Access requires authorization.",
     httpNoReply: (protocol) => `No response to the ${protocol} request`,
     timeout: "Timed out",
     response: "Response",
@@ -197,8 +199,14 @@ function technicalDetails(error) {
 function getStatus(data, protocol) {
   const code = data.http?.status_code;
   if (code != null) {
-    const title = code >= 400 ? labels.httpStatusError : labels.httpReply(protocol);
-    return { tone: code >= 400 ? "warn" : "ok", title: `${title} · HTTP ${code}` };
+    const authRequired = code === 401;
+    const showError = code >= 400 && !authRequired;
+    const title = showError ? labels.httpStatusError : labels.httpReply(protocol);
+    return {
+      tone: showError ? "warn" : "ok",
+      title: `${title} · HTTP ${code}`,
+      note: authRequired ? labels.httpAuthRequired : null,
+    };
   }
 
   const openPorts = data.ports.filter((port) => port.ok).map((port) => port.port);
