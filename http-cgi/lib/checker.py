@@ -7,6 +7,7 @@ import time
 import urllib.error
 import urllib.request
 from dataclasses import asdict, dataclass
+from http.client import HTTPException
 from typing import Any
 from urllib.parse import urlparse
 
@@ -48,6 +49,8 @@ class HttpResult:
     content_type: str | None = None
     body_preview: str | None = None
     error: str | None = None
+    error_kind: str | None = None
+    body_error: str | None = None
 
     @property
     def response_summary(self) -> str | None:
@@ -125,6 +128,8 @@ def _http_result(
     body: bytes,
     content_type: str | None,
     error: str | None = None,
+    error_kind: str | None = None,
+    body_error: str | None = None,
 ) -> HttpResult:
     preview = _body_preview(body, content_type) if body else None
     return HttpResult(
@@ -136,6 +141,8 @@ def _http_result(
         content_type=content_type,
         body_preview=preview or None,
         error=error,
+        error_kind=error_kind,
+        body_error=body_error,
     )
 
 
@@ -160,35 +167,29 @@ def _probe_tcp(host: str, port: int, timeout: float) -> PortResult:
         return PortResult(port=port, ok=False, latency_ms=None, error=str(exc))
 
 
+def _http_error_kind(exc: Exception) -> str:
+    reason = exc.reason if isinstance(exc, urllib.error.URLError) else exc
+    if isinstance(reason, ssl.SSLCertVerificationError):
+        return "tls_certificate"
+    if isinstance(reason, ssl.SSLError):
+        return "tls_error"
+    if isinstance(reason, TimeoutError):
+        # urllib exposes handshake timeouts as socket timeouts with this detail.
+        if "handshake" in str(reason).lower():
+            return "tls_timeout"
+        return "timeout"
+    return "connection_error"
+
+
 def _probe_http(url: str, timeout: float) -> HttpResult:
     started = time.perf_counter()
     request = urllib.request.Request(url, method="GET", headers={"User-Agent": "rf-reachability-checker/1.0"})
+    response_error = None
     try:
-        with urllib.request.urlopen(request, timeout=timeout, context=ssl.create_default_context()) as response:
-            body = response.read(8192)
-            latency_ms = round((time.perf_counter() - started) * 1000, 1)
-            content_type = response.headers.get("Content-Type")
-            return _http_result(
-                ok=True,
-                url=url,
-                status_code=response.status,
-                latency_ms=latency_ms,
-                body=body,
-                content_type=content_type,
-            )
+        response = urllib.request.urlopen(request, timeout=timeout, context=ssl.create_default_context())
     except urllib.error.HTTPError as exc:
-        latency_ms = round((time.perf_counter() - started) * 1000, 1)
-        body = exc.read(8192)
-        content_type = exc.headers.get("Content-Type") if exc.headers else None
-        return _http_result(
-            ok=True,
-            url=url,
-            status_code=exc.code,
-            latency_ms=latency_ms,
-            body=body,
-            content_type=content_type,
-            error=str(exc),
-        )
+        response = exc
+        response_error = str(exc)
     except Exception as exc:  # noqa: BLE001
         return _http_result(
             ok=False,
@@ -198,7 +199,29 @@ def _probe_http(url: str, timeout: float) -> HttpResult:
             body=b"",
             content_type=None,
             error=str(exc),
+            error_kind=_http_error_kind(exc),
         )
+
+    with response:
+        status_code = response.status
+        content_type = response.headers.get("Content-Type") if response.headers else None
+        body_error = None
+        try:
+            body = response.read(8192)
+        except (OSError, HTTPException) as exc:
+            body = b""
+            body_error = str(exc)
+
+    return _http_result(
+        ok=True,
+        url=url,
+        status_code=status_code,
+        latency_ms=round((time.perf_counter() - started) * 1000, 1),
+        body=body,
+        content_type=content_type,
+        error=response_error,
+        body_error=body_error,
+    )
 
 
 def check_target(raw: str, probe_from: str = "rf-probe") -> CheckResult:

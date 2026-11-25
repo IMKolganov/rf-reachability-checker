@@ -22,6 +22,16 @@ def index():
     return render_template("index.html", site_name=os.getenv("SITE_NAME", "rf-probe"))
 
 
+@application.get("/docs")
+def docs():
+    return render_template("docs.html")
+
+
+@application.get("/openapi.json")
+def openapi():
+    return application.send_static_file("openapi.json")
+
+
 @application.get("/health")
 def health():
     return jsonify({"status": "ok"})
@@ -29,8 +39,14 @@ def health():
 
 @application.post("/api/check")
 def api_check():
-    payload = request.get_json(silent=True) or {}
-    target = (payload.get("target") or request.form.get("target") or "").strip()
+    payload = request.get_json(silent=True)
+    if payload is not None and not isinstance(payload, dict):
+        return jsonify({"error": "JSON body must be an object"}), 400
+
+    target = (payload or {}).get("target", request.form.get("target", ""))
+    if not isinstance(target, str):
+        return jsonify({"error": "target must be a string"}), 400
+    target = target.strip()
     if not target:
         return jsonify({"error": "target is required"}), 400
 

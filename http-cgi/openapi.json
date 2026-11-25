@@ -1,0 +1,130 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "RF Reachability API",
+    "version": "1.0.0",
+    "description": "Check DNS, TCP, and HTTP reachability from Russia."
+  },
+  "servers": [{ "url": "." }],
+  "paths": {
+    "/check.cgi": {
+      "get": {
+        "operationId": "checkTargetQuery",
+        "summary": "Check a target supplied in the query string",
+        "parameters": [
+          {
+            "name": "target",
+            "in": "query",
+            "required": true,
+            "schema": { "$ref": "#/components/schemas/CheckRequest/properties/target" }
+          }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/CheckResult" },
+          "400": { "$ref": "#/components/responses/InvalidTarget" }
+        }
+      }
+    }
+  },
+  "components": {
+    "responses": {
+      "CheckResult": {
+        "description": "Completed check. The target may be unreachable.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/CheckResponse" }
+          }
+        }
+      },
+      "InvalidTarget": {
+        "description": "The target is missing or invalid.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "CheckRequest": {
+        "type": "object",
+        "required": ["target"],
+        "properties": {
+          "target": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A domain, IP address, or HTTP(S) URL. A port can be included.",
+            "examples": ["example.com", "8.8.8.8", "https://example.com/"]
+          }
+        }
+      },
+      "CheckResponse": {
+        "type": "object",
+        "required": ["input", "host", "reachable", "summary", "probe_from", "dns", "ports", "http"],
+        "properties": {
+          "input": { "type": "string", "description": "The submitted target, with surrounding whitespace removed." },
+          "host": { "type": "string" },
+          "reachable": { "type": "boolean" },
+          "summary": { "type": "string", "enum": ["DNS failed", "reachable", "unreachable"] },
+          "probe_from": { "type": "string" },
+          "dns": { "$ref": "#/components/schemas/DnsResult" },
+          "ports": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/PortResult" }
+          },
+          "http": {
+            "description": "Null when no HTTP check was performed.",
+            "anyOf": [
+              { "$ref": "#/components/schemas/HttpResult" },
+              { "type": "null" }
+            ]
+          }
+        }
+      },
+      "DnsResult": {
+        "type": "object",
+        "required": ["ok", "addresses", "latency_ms", "error"],
+        "properties": {
+          "ok": { "type": "boolean" },
+          "addresses": { "type": "array", "items": { "type": "string" } },
+          "latency_ms": { "type": ["number", "null"] },
+          "error": { "type": ["string", "null"] }
+        }
+      },
+      "PortResult": {
+        "type": "object",
+        "required": ["port", "ok", "latency_ms", "error"],
+        "properties": {
+          "port": { "type": "integer" },
+          "ok": { "type": "boolean" },
+          "latency_ms": { "type": ["number", "null"] },
+          "error": { "type": ["string", "null"] }
+        }
+      },
+      "HttpResult": {
+        "type": "object",
+        "required": ["ok", "url", "status_code", "latency_ms", "bytes_read", "content_type", "body_preview", "error", "error_kind", "body_error", "response_summary"],
+        "properties": {
+          "ok": { "type": "boolean", "description": "Whether an HTTP response arrived, including 4xx and 5xx responses." },
+          "url": { "type": "string" },
+          "status_code": { "type": ["integer", "null"] },
+          "latency_ms": { "type": ["number", "null"] },
+          "bytes_read": { "type": "integer", "minimum": 0 },
+          "content_type": { "type": ["string", "null"] },
+          "body_preview": { "type": ["string", "null"] },
+          "error": { "type": ["string", "null"] },
+          "error_kind": { "enum": ["tls_certificate", "tls_error", "tls_timeout", "timeout", "connection_error", null] },
+          "body_error": { "type": ["string", "null"] },
+          "response_summary": { "type": ["string", "null"] }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": { "type": "string" }
+        }
+      }
+    }
+  }
+}
