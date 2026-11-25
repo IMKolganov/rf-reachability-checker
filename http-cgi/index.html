@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>RF Reachability</title>
-  <link rel="stylesheet" href="static/style.css?v=bf7896ab0559">
-  <script src="static/app.js?v=87295f251fb8" defer></script>
+  <link rel="stylesheet" href="static/style.css?v=66afb8ff2892">
+  <script src="static/app.js?v=eaf81b58bf43" defer></script>
 </head>
 <body>
   <main class="shell">
@@ -36,7 +36,7 @@
 
     <header class="hero">
       <p class="eyebrow" data-i18n="checkFromRussia">Проверка из России</p>
-      <h1>RF Reachability <small class="project-version">v1.0.1</small></h1>
+      <h1>RF Reachability <small class="project-version">v1.0.2</small></h1>
       <p class="lead">
         <span data-i18n="lead">Введите IP-адрес или домен, чтобы проверить доступность с хостинга</span>
         <strong>rf-probe</strong> <span data-i18n="location">(Москва, Россия).</span>
@@ -64,11 +64,14 @@
       </form>
     </section>
 
-    <section id="result" class="panel result hidden" aria-live="polite"></section>
+    <section id="result" class="panel result hidden" aria-live="polite" tabindex="-1"></section>
+    <p id="probe-from" class="probe-from"></p>
 
-    <footer class="footer">
-      <span id="probe-from"></span>
-    </footer>
+    <section id="history" class="panel history" aria-labelledby="history-title">
+      <h2 id="history-title" data-i18n="history">История проверок</h2>
+      <p id="history-empty" data-i18n="historyEmpty">Здесь появятся результаты новых проверок в этом браузере.</p>
+      <ul id="history-list"></ul>
+    </section>
   </main>
 </body>
 </html>

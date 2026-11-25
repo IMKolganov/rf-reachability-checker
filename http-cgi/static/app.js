@@ -16,6 +16,9 @@ const translations = {
     hint: "Можно указать URL",
     submit: "Проверить",
     pending: "Проверяем…",
+    history: "История проверок",
+    historyEmpty: "Здесь появятся результаты новых проверок в этом браузере.",
+    resultUnavailable: "Результат проверки не сохранён",
     dnsFailed: "Ошибка DNS",
     dnsNoAddress: "Не удалось определить IP-адрес.",
     dnsLatency: "Время разрешения",
@@ -74,6 +77,9 @@ const translations = {
     hint: "You can also enter a URL",
     submit: "Check",
     pending: "Checking…",
+    history: "Check history",
+    historyEmpty: "New checks from this browser will appear here.",
+    resultUnavailable: "No saved result for this check",
     dnsFailed: "DNS lookup failed",
     dnsNoAddress: "Could not resolve the IP address.",
     dnsLatency: "DNS latency",
@@ -124,10 +130,90 @@ const targetInput = document.getElementById("target");
 const submitBtn = document.getElementById("submit-btn");
 const resultEl = document.getElementById("result");
 const probeFromEl = document.getElementById("probe-from");
+const historyList = document.getElementById("history-list");
+const historyEmptyEl = document.getElementById("history-empty");
+const historyPrefix = "rf-reachability-check-";
+const historyLimit = 50;
 
 let labels = translations.en;
-let resultData;
-let resultError;
+let checks = form ? readHistory().slice(0, historyLimit) : [];
+let selectedCheck = checks[0];
+let pendingCheck;
+
+function isCheckResult(data) {
+  return typeof data?.input === "string"
+    && typeof data.host === "string"
+    && typeof data.probe_from === "string"
+    && Array.isArray(data.dns?.addresses)
+    && (data.dns.latency_ms == null || Number.isFinite(data.dns.latency_ms))
+    && Array.isArray(data.ports)
+    && data.ports.every((port) => Number.isInteger(port?.port)
+      && (port.latency_ms == null || Number.isFinite(port.latency_ms)))
+    && (data.http == null || (typeof data.http.url === "string"
+      && (data.http.latency_ms == null || Number.isFinite(data.http.latency_ms))
+      && (data.http.status_code == null || (Number.isInteger(data.http.status_code)
+        && Number.isInteger(data.http.bytes_read)))));
+}
+
+function readHistory() {
+  try {
+    const storage = window.localStorage;
+    return Object.keys(storage)
+      .filter((key) => key.startsWith(historyPrefix))
+      .map((key) => readCheck(storage, key))
+      .filter(Boolean)
+      .sort(newestFirst);
+  } catch {
+    return [];
+  }
+}
+
+function readCheck(storage, key) {
+  try {
+    const check = JSON.parse(storage.getItem(key));
+    if (typeof check?.id === "string"
+      && key === historyPrefix + check.id
+      && typeof check.target === "string"
+      && typeof check.startedAt === "number"
+      && Number.isFinite(new Date(check.startedAt).getTime())
+      && (check.result === undefined || isCheckResult(check.result))
+      && (check.error === undefined || typeof check.error === "string")) {
+      return check;
+    }
+  } catch {
+    // Ignore an individual unreadable record.
+  }
+}
+
+function newestFirst(a, b) {
+  return b.startedAt - a.startedAt || b.id.localeCompare(a.id);
+}
+
+function saveCheck(check) {
+  try {
+    window.localStorage.setItem(historyPrefix + check.id, JSON.stringify(check));
+  } catch {
+    // History remains available until the current page is closed.
+  }
+
+  const savedChecks = readHistory();
+  const byId = new Map(checks.map((entry) => [entry.id, entry]));
+  for (const saved of savedChecks.slice(0, historyLimit)) {
+    if (!byId.has(saved.id) || saved.result || saved.error !== undefined) {
+      byId.set(saved.id, saved);
+    }
+  }
+  byId.set(check.id, check);
+  checks = [...byId.values()].sort(newestFirst).slice(0, historyLimit);
+
+  try {
+    for (const expired of savedChecks.slice(historyLimit)) {
+      window.localStorage.removeItem(historyPrefix + expired.id);
+    }
+  } catch {
+    // The page still shows only the latest checks.
+  }
+}
 
 function restorePreference(select) {
   try {
@@ -167,8 +253,8 @@ function applyLanguage() {
   if (form) {
     targetInput.placeholder = labels.placeholder;
     submitBtn.textContent = submitBtn.disabled ? labels.pending : labels.submit;
-    if (resultData) renderResult(resultData);
-    if (resultError) renderError(resultError);
+    renderSelectedCheck();
+    renderHistory();
   }
 }
 
@@ -196,7 +282,12 @@ function technicalDetails(error) {
   return `<details><summary>${labels.details}</summary><p><code>${escapeText(error)}</code></p></details>`;
 }
 
-function getStatus(data, protocol) {
+function httpProtocol(data) {
+  return data.http?.url.startsWith("http:") ? "HTTP" : "HTTPS";
+}
+
+function getStatus(data) {
+  const protocol = httpProtocol(data);
   const code = data.http?.status_code;
   if (code != null) {
     const authRequired = code === 401;
@@ -262,8 +353,7 @@ function renderHttp(http, protocol, input) {
 }
 
 function renderResult(data) {
-  const protocol = data.http?.url.startsWith("http:") ? "HTTP" : "HTTPS";
-  const status = getStatus(data, protocol);
+  const status = getStatus(data);
   const dnsLines = data.dns.ok
     ? line(true, `IP — ${data.dns.addresses.join(", ")}`)
       + (data.dns.latency_ms != null ? `<p>${labels.dnsLatency} — ${fmtMs(data.dns.latency_ms)}</p>` : "")
@@ -290,7 +380,7 @@ function renderResult(data) {
         <h3>TCP</h3>
         ${portLines}
       </div>
-      ${renderHttp(data.http, protocol, data.input)}
+      ${renderHttp(data.http, httpProtocol(data), data.input)}
     </div>
   `;
 
@@ -298,7 +388,7 @@ function renderResult(data) {
   resultEl.classList.remove("hidden");
 }
 
-function renderError(error) {
+function renderError(errorMessage) {
   const errors = new Map([
     ["target is required", labels.requiredTarget],
     ["target query param is required", labels.requiredTarget],
@@ -306,22 +396,94 @@ function renderError(error) {
     ["invalid host or URL", labels.invalidTarget],
     ["target must be a string", labels.invalidTarget],
   ]);
-  const message = errors.get(error.message) || error.message || labels.checkFailed;
+  const message = errors.get(errorMessage) || errorMessage || labels.checkFailed;
   resultEl.innerHTML = `<div class="status-badge bad">${labels.error}: ${escapeText(message)}</div>`;
   resultEl.classList.remove("hidden");
+}
+
+function renderSelectedCheck() {
+  probeFromEl.textContent = "";
+  if (!selectedCheck || selectedCheck === pendingCheck) {
+    resultEl.classList.add("hidden");
+  } else if (selectedCheck.result) {
+    renderResult(selectedCheck.result);
+  } else if (selectedCheck.error !== undefined) {
+    renderError(selectedCheck.error);
+  } else {
+    resultEl.textContent = labels.resultUnavailable;
+    resultEl.classList.remove("hidden");
+  }
+}
+
+function historyStatus(check) {
+  if (check.result) return getStatus(check.result);
+  if (check.error !== undefined) return { tone: "bad", title: labels.checkFailed };
+  return { title: check === pendingCheck ? labels.pending : labels.resultUnavailable };
+}
+
+function renderHistory() {
+  if (historyEmptyEl) historyEmptyEl.hidden = checks.length > 0;
+  if (!historyList) return;
+  const dateFormat = new Intl.DateTimeFormat(document.documentElement.lang, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+  const focusedId = historyList.contains(document.activeElement) ? document.activeElement.dataset.checkId : null;
+  let focusedButton;
+  historyList.replaceChildren(...checks.map((check) => {
+    const item = document.createElement("li");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.checkId = check.id;
+    button.disabled = check === pendingCheck;
+    if (check.id === selectedCheck?.id) button.setAttribute("aria-current", "true");
+    if (check.id === focusedId) focusedButton = button;
+
+    const target = document.createElement("span");
+    target.textContent = check.target;
+
+    const time = document.createElement("time");
+    const startedAt = new Date(check.startedAt);
+    time.dateTime = startedAt.toISOString();
+    time.textContent = dateFormat.format(startedAt);
+
+    const status = historyStatus(check);
+    const summary = document.createElement("span");
+    summary.className = "history-status";
+    if (status.tone) summary.classList.add(status.tone);
+    summary.textContent = status.title;
+
+    button.append(target, time, summary);
+    button.addEventListener("click", () => {
+      selectedCheck = check;
+      targetInput.value = check.target;
+      renderSelectedCheck();
+      resultEl.focus();
+      renderHistory();
+    });
+    item.append(button);
+    return item;
+  }));
+  focusedButton?.focus({ preventScroll: true });
 }
 
 async function submitCheck(event) {
   event.preventDefault();
   const target = targetInput.value.trim();
-  if (!target) return;
+  if (!target || pendingCheck) return;
 
-  resultData = undefined;
-  resultError = undefined;
+  const check = {
+    id: window.crypto.getRandomValues(new Uint32Array(4)).join("-"),
+    target,
+    startedAt: Date.now(),
+  };
+  selectedCheck = check;
+  pendingCheck = check;
   submitBtn.disabled = true;
   submitBtn.textContent = labels.pending;
-  resultEl.classList.add("hidden");
-  probeFromEl.textContent = "";
+  saveCheck(check);
+  renderSelectedCheck();
+  renderHistory();
 
   try {
     const url = new URL(form.action);
@@ -335,22 +497,25 @@ async function submitCheck(event) {
     }
     const response = await fetch(url, options);
     const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error);
+    if (!response.ok || !isCheckResult(data)) {
+      throw new Error(data?.error);
     }
-    renderResult(data);
-    resultData = data;
+    check.result = data;
   } catch (error) {
-    resultError = error;
-    renderError(error);
+    check.error = error.message || "";
   } finally {
+    pendingCheck = undefined;
     submitBtn.disabled = false;
     submitBtn.textContent = labels.submit;
+    saveCheck(check);
+    if (selectedCheck === check) renderSelectedCheck();
+    renderHistory();
   }
 }
 
 restorePreference(languageSelect);
 restorePreference(themeSelect);
+if (selectedCheck) targetInput.value = selectedCheck.target;
 applyTheme();
 applyLanguage();
 
