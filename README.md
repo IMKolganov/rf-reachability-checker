@@ -21,6 +21,15 @@ Open http://127.0.0.1:8080
 
 ## API
 
+The home page links to the API documentation and an OpenAPI JSON document with the request and response schemas.
+
+| Deployment | Documentation | OpenAPI JSON |
+| --- | --- | --- |
+| Flask/WSGI | `/docs` | `/openapi.json` |
+| CGI | `/docs.html` | `/openapi.json` |
+
+Flask/WSGI examples:
+
 ```bash
 curl -s "http://127.0.0.1:8080/api/check?target=google.com" | jq
 curl -s "http://127.0.0.1:8080/api/check?target=https://www.google.com/" | jq
@@ -29,7 +38,11 @@ curl -s -X POST http://127.0.0.1:8080/api/check \
   -d '{"target":"8.8.8.8"}' | jq
 ```
 
-HTTP probe returns `response_summary`, e.g. `code 200, response: ...` (HTML tags removed from preview).
+For CGI, send `GET /check.cgi?target=example.com`.
+
+The result page shows DNS resolution, TCP connections, and whether the web request returned an HTTP status. A successful TCP connection can coexist with a failed HTTPS request. HTTP 4xx and 5xx responses appear as errors with the status code shown.
+
+In the API, `reachable` and `summary` report the existing network-level verdict. `http.status_code` is set when the web request returned an HTTP status, including 4xx and 5xx. `http.error_kind` identifies failures before a status is received, such as `tls_timeout` or `tls_certificate`. `http.body_error` records a failed body read after a status is received. `http.response_summary` may include a plain-text preview with HTML tags removed.
 
 ## Deploy
 
